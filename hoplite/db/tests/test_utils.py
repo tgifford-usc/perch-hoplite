@@ -70,7 +70,7 @@ def insert_random_embeddings(
     embedding = np.float32(rng.normal(size=emb_dim, loc=0, scale=0.1))
     dataset_name = rng.choice(dataset_names)
     source_name = ''.join(
-        [str(a) for a in np.random.choice(np_alpha, size=3, replace=False)]
+        [str(a) for a in rng.choice(np_alpha, size=8, replace=False)]
     )
     offsets = rng.integers(0, 100, size=[1])
     source = interface.EmbeddingSource(dataset_name, source_name, offsets)
