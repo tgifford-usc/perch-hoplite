@@ -20,11 +20,12 @@ from typing import Callable
 
 from etils import epath
 from hoplite import audio_io
+from hoplite.agile import source_info
 import numpy as np
 
 
 def make_filepath_loader(
-    audio_globs: dict[str, tuple[str, str]],
+    audio_sources: source_info.AudioSources,
     sample_rate_hz: int = 32000,
     window_size_s: float = 5.0,
     dtype: str = 'float32',
@@ -34,8 +35,7 @@ def make_filepath_loader(
   Note that if multiple globs match a given source ID, the first match is used.
 
   Args:
-    audio_globs: Mapping from dataset name to pairs of `(root directory, file
-      glob)`. (See `embed.EmbedConfig` for details.)
+    audio_sources: Embedding audio sources.
     sample_rate_hz: Sample rate of the audio.
     window_size_s: Window size of the audio.
     dtype: Data type of the audio.
@@ -49,8 +49,8 @@ def make_filepath_loader(
 
   def loader(source_id: str, offset_s: float) -> np.ndarray:
     found_path = None
-    for base_path, _ in audio_globs.values():
-      path = epath.Path(base_path) / source_id
+    for audio_source in audio_sources.audio_globs:
+      path = epath.Path(audio_source.base_path) / source_id
       if path.exists():
         found_path = path
         break

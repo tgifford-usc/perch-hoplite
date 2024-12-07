@@ -115,7 +115,7 @@ def load_audio_window_soundfile(
   with epath.Path(filepath).open('rb') as f:
     sf = soundfile.SoundFile(f)
     if offset_s > 0:
-      offset = int(offset_s * sf.samplerate)
+      offset = int(np.float32(offset_s) * sf.samplerate)
       sf.seek(offset)
     if window_size_s < 0:
       a = sf.read()

@@ -22,6 +22,7 @@ from unittest import mock
 
 from hoplite.agile import audio_loader
 from hoplite.agile import embedding_display
+from hoplite.agile import source_info
 from hoplite.agile.tests import test_utils
 from hoplite.db import interface
 import IPython
@@ -170,11 +171,14 @@ class EmbeddingDisplayTest(absltest.TestCase):
         sample_rate_hz=sample_rate_hz,
     )
 
-    audio_globs = {
-        'test_dataset': (self.tempdir, '*/*.wav'),
-    }
+    audio_source = source_info.AudioSourceConfig(
+        dataset_name='test_dataset',
+        base_path=self.tempdir,
+        file_glob='*/*.wav',
+    )
+    audio_sources = source_info.AudioSources((audio_source,))
     filepath_audio_loader = audio_loader.make_filepath_loader(
-        audio_globs, sample_rate_hz=sample_rate_hz, window_size_s=1.0
+        audio_sources, sample_rate_hz=sample_rate_hz, window_size_s=1.0
     )
     group = embedding_display.EmbeddingDisplayGroup.create(
         members=[member0, member1],
