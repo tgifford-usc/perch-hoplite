@@ -82,6 +82,8 @@ class HopliteTest(parameterized.TestCase):
       embs = db.get_embeddings_by_source(source.dataset_name, 'fake_id', None)
       self.assertEqual(embs.shape[0], 0)
 
+      sources = db.get_embedding_sources(idxes[:3])
+      self.assertLen(sources, 3)
     db.commit()
 
   @parameterized.product(db_type=PERSISTENT_DB_TYPES)

@@ -263,6 +263,12 @@ class HopliteDBInterface(abc.ABC):
     embeddings = [self.get_embedding(int(idx)) for idx in embedding_ids]
     return embedding_ids, np.array(embeddings)
 
+  def get_embedding_sources(
+      self, embedding_ids: np.ndarray
+  ) -> tuple[EmbeddingSource, ...]:
+    """Get an array of embedding sources for the indicated IDs."""
+    return tuple(self.get_embedding_source(int(idx)) for idx in embedding_ids)
+
   def random_batched_iterator(
       self,
       ids: np.ndarray,
