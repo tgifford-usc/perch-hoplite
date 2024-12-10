@@ -16,14 +16,15 @@
 """Functions for training and applying a linear classifier."""
 
 import base64
+from concurrent import futures
 import dataclasses
 import json
-from typing import Any, Sequence
+from typing import Any, Iterator, Sequence
 
+from etils import epath
 from hoplite.agile import classifier_data
 from hoplite.agile import metrics
 from hoplite.db import interface as db_interface
-from hoplite.taxonomy import namespace
 from ml_collections import config_dict
 import numpy as np
 import tensorflow as tf
@@ -230,50 +231,116 @@ def train_linear_classifier(
   return linear_classifier, eval_scores
 
 
-def write_inference_csv(
-    linear_classifier: LinearClassifier,
-    db: db_interface.HopliteDBInterface,
-    output_filepath: str,
-    threshold: float,
-    labels: Sequence[str] | None = None,
-):
-  """Write a CSV for all audio windows with logits above a threshold.
+@dataclasses.dataclass
+class CsvWorkerState:
+  """State for the CSV worker.
+
+  Params:
+    db: The base database from the parent thread.
+    csv_filepath: The path to the CSV file to write.
+    labels: The labels to write.
+    threshold: The threshold for writing detections.
+    _thread_db: The database to use in child threads.
+  """
+
+  db: db_interface.HopliteDBInterface
+  csv_filepath: str
+  labels: tuple[str, ...]
+  threshold: float
+  _thread_db: db_interface.HopliteDBInterface | None = None
+
+  def get_thread_db(self) -> db_interface.HopliteDBInterface:
+    if self._thread_db is None:
+      self._thread_db = self.db.thread_split()
+    return self._thread_db
+
+
+def csv_worker_initializer(state: CsvWorkerState):
+  """Initialize the CSV worker."""
+  state.get_thread_db()
+  with epath.Path(state.csv_filepath).open('w') as f:
+    f.write('idx,dataset_name,source_id,offset,label,logits\n')
+
+
+def csv_worker_fn(
+    embedding_ids: np.ndarray, logits: np.ndarray, state: CsvWorkerState
+) -> None:
+  """Writes a CSV row for each detection.
 
   Args:
-    params: The parameters of the linear classifier.
-    class_list: The class list of labels associated with the classifier.
-    db: HopliteDBInterface to read embeddings from.
-    output_filepath: Path to write the CSV to.
-    threshold: Logits must be above this value to be written.
-    labels: If provided, only write logits for these labels. If None, write
-      logits for all labels.
-
-  Returns:
-    None
+    embedding_ids: The embedding ids to write.
+    logits: The logits for each embedding id.
+    state: The state of the worker.
   """
-  idxes = db.get_embedding_ids()
-  if labels is None:
-    labels = linear_classifier.classes
-  label_ids = {cl: i for i, cl in enumerate(linear_classifier.classes)}
-  target_label_ids = np.array([label_ids[l] for l in labels])
-  logits_fn = lambda emb: linear_classifier(emb)[target_label_ids]
-  detection_count = 0
-  with open(output_filepath, 'w') as f:
-    f.write('idx,dataset_name,source_id,offset,label,logits\n')
-    for idx in tqdm.tqdm(idxes):
+  db = state.get_thread_db()
+  with epath.Path(state.csv_filepath).open('a') as f:
+    for idx, logit in zip(embedding_ids, logits):
       source = db.get_embedding_source(idx)
-      emb = db.get_embedding(idx)
-      logits = logits_fn(emb)
-      for a in np.argwhere(logits > threshold):
-        lbl = labels[a[0]]
+      for a in np.argwhere(logit > state.threshold):
+        lbl = state.labels[a[0]]
         row = [
             idx,
             source.dataset_name,
             source.source_id,
             source.offsets[0],
             lbl,
-            logits[a],
+            logit[a][0],
         ]
         f.write(','.join(map(str, row)) + '\n')
-        detection_count += 1
+
+
+def batched_embedding_iterator(
+    db: db_interface.HopliteDBInterface,
+    embedding_ids: np.ndarray,
+    batch_size: int = 1024,
+) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+  """Iterate over embeddings in batches."""
+  for q in range(0, len(embedding_ids), batch_size):
+    batch_ids = embedding_ids[q : q + batch_size]
+    batch_ids, batch_embs = db.get_embeddings(batch_ids)
+    yield batch_ids, batch_embs
+
+
+def write_inference_csv(
+    linear_classifier: LinearClassifier,
+    db: db_interface.HopliteDBInterface,
+    output_filepath: str,
+    threshold: float,
+    labels: Sequence[str] | None = None,
+    embedding_ids: np.ndarray | None = None,
+) -> None:
+  """Write a CSV for all audio windows with logits above a threshold."""
+  if embedding_ids is None:
+    embedding_ids = db.get_embedding_ids()
+  if labels is None:
+    labels = linear_classifier.classes
+  else:
+    labels = tuple(set(labels).intersection(linear_classifier.classes))
+  label_ids = {cl: i for i, cl in enumerate(linear_classifier.classes)}
+  target_label_ids = np.array([label_ids[l] for l in labels])
+  logits_fn = lambda batch_embs: linear_classifier(batch_embs)[
+      :, target_label_ids
+  ]
+  detection_count = 0
+  state = CsvWorkerState(
+      db=db,
+      csv_filepath=output_filepath,
+      labels=labels,
+      threshold=threshold,
+  )
+  emb_iter = batched_embedding_iterator(db, embedding_ids, batch_size=1024)
+  with futures.ThreadPoolExecutor(
+      max_workers=1,
+      initializer=csv_worker_initializer,
+      initargs=(state,),
+  ) as executor:
+    for batch_idxes, batch_embs in tqdm.tqdm(emb_iter):
+      logits = logits_fn(batch_embs)
+      # Filter out rows with no detections, avoiding extra database retrievals.
+      detections = logits > threshold
+      keep_rows = detections.max(axis=1)
+      logits = logits[keep_rows]
+      kept_idxes = batch_idxes[keep_rows]
+      executor.submit(csv_worker_fn, kept_idxes, logits, state)
+      detection_count += detections.sum()
   print(f'Wrote {detection_count} detections to {output_filepath}')
