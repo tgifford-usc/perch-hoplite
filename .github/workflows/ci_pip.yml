@@ -36,5 +36,7 @@ jobs:
         run: python -m unittest discover -s hoplite/taxonomy -p "*test.py"
       - name: Test zoo with unittest
         run: python -m unittest discover -s hoplite/zoo -p "*test.py"
+      - name: Test zoo tensorflow models with unittest
+        run: python -m unittest discover -s hoplite/zoo/tests_tf -p "*test.py"
       - name: Test agile with unittest
         run: python -m unittest discover -s hoplite/agile/tests -p "*test.py"
