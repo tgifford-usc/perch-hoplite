@@ -74,8 +74,12 @@ class ZooTest(parameterized.TestCase):
       )
       self.assertSequenceEqual(batched_both_pooled.shape, [3, 8])
 
-  def test_configs(self):
-    for model_config_name in model_configs.ModelConfigName:
+  def test_simple_model_configs(self):
+    """Load check for configs without framework dependencies."""
+    for model_config_name in [
+        model_configs.ModelConfigName.PLACEHOLDER,
+        model_configs.ModelConfigName.BEANS_BASELINE,
+    ]:
       with self.subTest(model_config_name):
         preset_info = model_configs.get_preset_model_config(model_config_name)
         self.assertGreaterEqual(preset_info.embedding_dim, 0)

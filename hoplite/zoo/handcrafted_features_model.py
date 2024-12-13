@@ -26,77 +26,99 @@ import numpy as np
 
 @dataclasses.dataclass
 class HandcraftedFeaturesModel(zoo_interface.EmbeddingModel):
-  """Wrapper for simple feature extraction."""
+  """Wrapper for simple feature extraction.
+
+  Parameters:
+    window_size_s: The window size for framing the audio.
+    hop_size_s: The hop size for framing the audio.
+    features_config: The configuration for the features. Used as arguments to
+      librosa.feature.melspectrogram or librosa.feature.mfcc, depending on
+      `use_mfccs`.
+    use_mfccs: Whether to use MFCCs or melspectrogram.
+    aggregation: How to aggregate the features.
+  """
 
   window_size_s: float
   hop_size_s: float
-  melspec_config: config_dict.ConfigDict
+  features_config: config_dict.ConfigDict
+  use_mfccs: bool = True
   aggregation: str = 'beans'
 
   @classmethod
-  def from_config(
-      cls, config: config_dict.ConfigDict
-  ) -> 'HandcraftedFeaturesModel':
+  def from_config(cls, config: config_dict.ConfigDict) -> Self:
     return cls(**config)
 
   @classmethod
-  def beans_baseline(
+  def beans_baseline_config(
       cls, sample_rate=32000, frame_rate=100
-  ) -> 'HandcraftedFeaturesModel':
+  ) -> config_dict.ConfigDict:
     stride = sample_rate // frame_rate
-    mel_config = config_dict.ConfigDict({
+    features_config = config_dict.ConfigDict({
         'sample_rate': sample_rate,
-        'features': 160,
-        'stride': stride,
-        'kernel_size': 2 * stride,
+        'n_mfcc': 20,
+        'hop_length': stride,
+        'win_length': 2 * stride,
         'freq_range': (60.0, sample_rate / 2.0),
         'power': 2.0,
     })
-    features_config = config_dict.ConfigDict({
-        'compute_mfccs': True,
-        'aggregation': 'beans',
-    })
-    config = config_dict.ConfigDict({
+    return config_dict.ConfigDict({
         'sample_rate': sample_rate,
-        'melspec_config': mel_config,
         'features_config': features_config,
+        'use_mfccs': True,
         'window_size_s': 1.0,
         'hop_size_s': 1.0,
+        'aggregation': 'beans',
     })
+
+  @classmethod
+  def beans_baseline(cls, sample_rate=32000, frame_rate=100) -> Self:
+    config = cls.beans_baseline_config(sample_rate, frame_rate)
     # pylint: disable=unexpected-keyword-arg
     return HandcraftedFeaturesModel.from_config(config)
 
-  def melspec(self, audio_array: np.ndarray) -> np.ndarray:
+  def compute_features(self, audio_array: np.ndarray) -> np.ndarray:
     framed_audio = self.frame_audio(
         audio_array, self.window_size_s, self.hop_size_s
     )
     specs = []
     for frame in framed_audio:
-      specs.append(
-          librosa.feature.melspectrogram(
-              y=frame,
-              sr=self.sample_rate,
-              hop_length=self.melspec_config.stride,
-              win_length=self.melspec_config.kernel_size,
-              center=True,
-              n_mels=self.melspec_config.features,
-              power=self.melspec_config.power,
-          )
-      )
+      if self.use_mfccs:
+        features = librosa.feature.mfcc(
+            y=frame,
+            sr=self.sample_rate,
+            hop_length=self.features_config.hop_length,
+            win_length=self.features_config.win_length,
+            center=True,
+            norm='ortho',
+            dct_type=2,
+            n_mfcc=self.features_config.n_mfcc,
+        )
+      else:
+        features = librosa.feature.melspectrogram(
+            y=frame,
+            sr=self.sample_rate,
+            hop_length=self.features_config.hop_length,
+            win_length=self.features_config.win_length,
+            center=True,
+            n_mels=self.features_config.n_mels,
+            power=self.features_config.power,
+        )
+      specs.append(features)
     return np.stack(specs, axis=0)
 
   def embed(self, audio_array: np.ndarray) -> zoo_interface.InferenceOutputs:
     # Melspecs will have shape [melspec_channels, frames]
-    melspecs = self.melspec(audio_array)
+    features = self.compute_features(audio_array)
+    print(f'features: {features.shape}')
     if self.aggregation == 'beans':
       features = np.concatenate(
           [
-              melspecs.mean(axis=-1),
-              melspecs.std(axis=-1),
-              melspecs.min(axis=-1),
-              melspecs.max(axis=-1),
+              features.mean(axis=-1),
+              features.std(axis=-1),
+              features.min(axis=-1),
+              features.max(axis=-1),
           ],
-          axis=-2,
+          axis=-1,
       )
     else:
       raise ValueError(f'unrecognized aggregation: {self.aggregation}')

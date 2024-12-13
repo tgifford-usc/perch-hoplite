@@ -37,7 +37,10 @@ sudo apt-get update
 sudo apt-get install libsndfile1 ffmpeg
 pip install absl-py
 pip install requests
+# You may skip tensorflow installation if only using the hoplite/db library.
+# However, these are required for agile modeling and most models in the zoo.
 pip install tensorflow-cpu
+pip install tensorflow-hub
 ```
 
 Then to install with pip:
@@ -66,7 +69,7 @@ poetry install
 
 Machine learning framework libraries are pretty heavy! It can also be difficult to coordinate CUDA versions across multiple frameworks to ensure good GPU behavior.  Thus, we provide some ability to select dependencies according to your needs.
 
-Tensorflow is used in the `agile` library for training linear classifiers. If you do not need the `agile` library or any of the tensorflow models in the `zoo`, you can use poetry to install without tensorflow like so:
+Tensorflow is used in the `agile` library for training linear classifiers. If you do not need the `agile` library or any of the tensorflow models in the `zoo`, you may skip installation of tensorflow dependencies with pip. Alternatively, you can use poetry to install without tensorflow like so:
 
 ```bash
 poetry install --without tf

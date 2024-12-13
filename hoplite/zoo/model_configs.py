@@ -35,6 +35,9 @@ class ModelConfigName(enum.Enum):
   YAMNET = 'yamnet'
   HUMPBACK = 'humpback'
   MULTISPECIES_WHALE = 'multispecies_whale'
+  BEANS_BASELINE = 'beans_baseline'
+  AVES = 'aves'
+  PLACEHOLDER = 'placeholder'
 
 
 @dataclasses.dataclass
@@ -82,6 +85,9 @@ def get_model_class(model_key: str) -> type[zoo_interface.EmbeddingModel]:
   elif model_key == 'aves':
     module = importlib.import_module('hoplite.zoo.aves_model')
     return module.AVES
+  elif model_key == 'handcrafted_features_model':
+    module = importlib.import_module('hoplite.zoo.handcrafted_features_model')
+    return module.HandcraftedFeaturesModel
   else:
     raise ValueError(f'Unknown model key: {model_key}')
 
@@ -176,8 +182,12 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
     model_key = 'aves'
     embedding_dim = 768
     model_config.sample_rate = 16000
-  elif preset_name == 'placeholder':
+  elif preset_name == ModelConfigName.PLACEHOLDER:
     model_key = 'placeholder'
+    embedding_dim = 128
+    model_config.sample_rate = 16000
+  elif preset_name == ModelConfigName.BEANS_BASELINE:
+    model_key = 'handcrafted_features_model'
     embedding_dim = 128
     model_config.sample_rate = 16000
   else:

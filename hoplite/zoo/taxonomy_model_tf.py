@@ -19,9 +19,9 @@ import dataclasses
 from typing import Any
 
 from absl import logging
+from etils import epath
 from hoplite.taxonomy import namespace
 from hoplite.zoo import zoo_interface
-from etils import epath
 from ml_collections import config_dict
 import numpy as np
 import tensorflow as tf
