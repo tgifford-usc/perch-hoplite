@@ -1,5 +1,7 @@
 # Perch Hoplite
 
+![CI](https://github.com/google-research/hoplite/actions/workflows/ci.yml/badge.svg)
+
 Hoplite is a system for storing large volumes of embeddings from machine
 perception models. We focus on combining vector search with active learning
 workflows, aka [agile modeling](https://arxiv.org/abs/2302.12948).
