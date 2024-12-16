@@ -84,6 +84,15 @@ class ZooTest(parameterized.TestCase):
         preset_info = model_configs.get_preset_model_config(model_config_name)
         self.assertGreaterEqual(preset_info.embedding_dim, 0)
 
+  def test_beans_baseline_model(self):
+    """Load check for configs with framework dependencies."""
+    model = model_configs.load_model_by_name(
+        model_configs.ModelConfigName.BEANS_BASELINE
+    )
+    fake_audio = np.zeros([5 * 32000], dtype=np.float32)
+    outputs = model.embed(fake_audio)
+    self.assertSequenceEqual(outputs.embeddings.shape, [5, 1, 80])
+
 
 if __name__ == '__main__':
   absltest.main()

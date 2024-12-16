@@ -188,8 +188,9 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
     model_config.sample_rate = 16000
   elif preset_name == ModelConfigName.BEANS_BASELINE:
     model_key = 'handcrafted_features_model'
-    embedding_dim = 128
-    model_config.sample_rate = 16000
+    module = importlib.import_module('hoplite.zoo.handcrafted_features_model')
+    model_config = module.HandcraftedFeaturesModel.beans_baseline_config()
+    embedding_dim = 80
   else:
     raise ValueError('Unsupported model preset: %s' % preset_name)
   return PresetInfo(

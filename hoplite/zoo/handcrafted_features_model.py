@@ -16,7 +16,6 @@
 """Handcrafted features for linear models."""
 
 import dataclasses
-from typing import Self
 
 from hoplite.zoo import zoo_interface
 import librosa
@@ -45,7 +44,9 @@ class HandcraftedFeaturesModel(zoo_interface.EmbeddingModel):
   aggregation: str = 'beans'
 
   @classmethod
-  def from_config(cls, config: config_dict.ConfigDict) -> Self:
+  def from_config(
+      cls, config: config_dict.ConfigDict
+  ) -> 'HandcraftedFeaturesModel':
     return cls(**config)
 
   @classmethod
@@ -71,7 +72,9 @@ class HandcraftedFeaturesModel(zoo_interface.EmbeddingModel):
     })
 
   @classmethod
-  def beans_baseline(cls, sample_rate=32000, frame_rate=100) -> Self:
+  def beans_baseline(
+      cls, sample_rate=32000, frame_rate=100
+  ) -> 'HandcraftedFeaturesModel':
     config = cls.beans_baseline_config(sample_rate, frame_rate)
     # pylint: disable=unexpected-keyword-arg
     return HandcraftedFeaturesModel.from_config(config)
