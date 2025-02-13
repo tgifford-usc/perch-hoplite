@@ -16,14 +16,12 @@
 """Tests for namespace_db."""
 
 import io
-import random
 import tempfile
 
 from absl import logging
-import numpy as np
+from etils import epath
 from perch_hoplite.taxonomy import namespace
 from perch_hoplite.taxonomy import namespace_db
-import tensorflow as tf
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -55,19 +53,6 @@ class NamespaceDbTest(parameterized.TestCase):
     self.assertEqual(caples_orders.namespace, 'ebird2021_orders')
     self.assertLen(caples_orders.classes, 11)
 
-  def test_class_maps(self):
-    db = namespace_db.load_db()
-    caples_list = db.class_lists['caples']
-    sierras_list = db.class_lists['sierra_nevadas']
-    table, image_mask = caples_list.get_class_map_tf_lookup(sierras_list)
-    # The Caples list is a strict subset of the Sierras list.
-    self.assertLen(caples_list.classes, np.sum(image_mask))
-    self.assertEqual(image_mask.shape, (len(sierras_list.classes),))
-    for i in range(len(caples_list.classes)):
-      self.assertGreaterEqual(
-          table.lookup(tf.constant([i], dtype=tf.int64)).numpy()[0], 0
-      )
-
   def test_class_map_csv(self):
     cl = namespace.ClassList(
         'ebird2021', ('amecro', 'amegfi', 'amered', 'amerob')
@@ -81,7 +66,7 @@ class NamespaceDbTest(parameterized.TestCase):
     # Check that writing with tf.io.gfile behaves as expected, as newline
     # behavior may be different than working with StringIO.
     with tempfile.NamedTemporaryFile(suffix='.csv') as f:
-      with tf.io.gfile.GFile(f.name, 'w') as gf:
+      with epath.Path(f.name).open(mode='w') as gf:
         gf.write(cl_csv)
       with open(f.name, 'r') as f:
         got_cl = namespace.ClassList.from_csv(f.readlines())
@@ -165,92 +150,6 @@ class NamespaceDbTest(parameterized.TestCase):
     self.assertEmpty(missing_genera)
     self.assertEmpty(missing_families)
     self.assertEmpty(missing_orders)
-
-  def test_reef_label_converting(self):
-    """Test operations used in ConvertReefLabels class.
-
-    Part 1: Get the index of a sample in source_classes and the corresponding
-     index from lookup table so that we can check the look up table returns
-     the right soundtype e.g 'bioph' for the label 'bioph_rattle_response'.
-    Part 2: Iterate over labels in a shuffled version of source_classes
-     and check if each label maps correctly to its expected sound type.
-    """
-    # Set up
-    db = namespace_db.load_db()
-    mapping = db.mappings['reef_class_to_soundtype']
-    source_classes = db.class_lists['all_reefs']
-    target_classes = db.class_lists['all_reefs']
-    soundtype_table = source_classes.get_namespace_map_tf_lookup(
-        mapping, target_class_list=target_classes, keep_unknown=True
-    )
-    # Part 1
-    test_labels = ['geoph_waves', 'bioph_rattle_response', 'anthrop_bomb']
-    expected_results = ['geoph', 'bioph', 'anthrop']
-    for test_label, expected_result in zip(test_labels, expected_results):
-      classlist_index = source_classes.classes.index(test_label)
-      lookup_index = soundtype_table.lookup(
-          tf.constant(classlist_index, dtype=tf.int64)
-      ).numpy()
-      lookup_label = target_classes.classes[lookup_index]
-      self.assertEqual(expected_result, lookup_label)
-    # Part 2
-    shuffled_classes = list(source_classes.classes)
-    np.random.seed(42)
-    random.shuffle(shuffled_classes)
-    for label in shuffled_classes:
-      # Every reef label is prefixed with either 'bioph', 'geoph', 'anthrop'
-      prefix = label.split('_')[0]
-      # Now mirror Part 1, by checking label against the prefix
-      classlist_index = source_classes.classes.index(label)
-      lookup_index = soundtype_table.lookup(
-          tf.constant(classlist_index, dtype=tf.int64)
-      ).numpy()
-      lookup_label = target_classes.classes[lookup_index]
-      self.assertEqual(prefix, lookup_label)
-
-  @parameterized.parameters(True, False, None)
-  def test_namespace_map_tf_lookup(self, keep_unknown):
-    source = namespace.ClassList(
-        'ebird2021', ('amecro', 'amegfi', 'amered', 'amerob', 'unknown')
-    )
-    mapping = namespace.Mapping(
-        'ebird2021',
-        'ebird2021',
-        {
-            'amecro': 'amered',
-            'amegfi': 'amerob',
-            'amered': 'amerob',
-            'amerob': 'amerob',
-        },
-    )
-    if keep_unknown is None:
-      self.assertRaises(
-          ValueError,
-          source.get_namespace_map_tf_lookup,
-          mapping=mapping,
-          keep_unknown=keep_unknown,
-      )
-      return
-
-    output_class_list = source.apply_namespace_mapping(
-        mapping, keep_unknown=keep_unknown
-    )
-    if keep_unknown:
-      expect_classes = ('amered', 'amerob', 'unknown')
-    else:
-      expect_classes = ('amered', 'amerob')
-    self.assertSequenceEqual(output_class_list.classes, expect_classes)
-    lookup = source.get_namespace_map_tf_lookup(
-        mapping, keep_unknown=keep_unknown
-    )
-    got = lookup.lookup(
-        tf.constant(list(range(len(source.classes))), dtype=tf.int64)
-    ).numpy()
-    if keep_unknown:
-      expect_idxs = (0, 1, 1, 1, 2)
-    else:
-      expect_idxs = (0, 1, 1, 1, -1)
-    self.assertSequenceEqual(tuple(got), expect_idxs)
 
 
 if __name__ == '__main__':
