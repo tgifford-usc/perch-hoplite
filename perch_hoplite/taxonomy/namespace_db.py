@@ -61,7 +61,7 @@ def validate_taxonomy_database(taxonomy_database: TaxonomyDatabase) -> None:
     ):
       raise ValueError(
           f"Mapping {mapping_name} contains a target class not in "
-          f"the namespace ({mapping.source_namespace})."
+          f"the namespace ({mapping.target_namespace})."
       )
 
   for class_name, class_list in taxonomy_database.class_lists.items():
