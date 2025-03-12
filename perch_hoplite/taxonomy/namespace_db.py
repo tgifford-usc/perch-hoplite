@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Database of bioacoustic label domains."""
+
 import dataclasses
 import functools
 import json
@@ -66,9 +67,11 @@ def validate_taxonomy_database(taxonomy_database: TaxonomyDatabase) -> None:
 
   for class_name, class_list in taxonomy_database.class_lists.items():
     classes = class_list.classes
-    if set(classes) - namespaces[class_list.namespace].classes > {
-        namespace.UNKNOWN_LABEL
-    }:
+    if (
+        set(classes)
+        - namespaces[class_list.namespace].classes
+        - {namespace.UNKNOWN_LABEL}
+    ):
       raise ValueError(
           f"ClassList {class_name} contains a class not in "
           f"the namespace ({class_list.namespace})."
@@ -76,7 +79,7 @@ def validate_taxonomy_database(taxonomy_database: TaxonomyDatabase) -> None:
 
 
 def load_taxonomy_database(
-    taxonomy_database: dict[str, typing.Any]
+    taxonomy_database: dict[str, typing.Any],
 ) -> TaxonomyDatabase:
   """Construct a taxonomy database from a dictionary.
 
@@ -109,7 +112,7 @@ def load_taxonomy_database(
       namespaces=namespaces,
       class_lists=class_lists,
       mappings=mappings,
-      **taxonomy_database
+      **taxonomy_database,
   )
 
 
