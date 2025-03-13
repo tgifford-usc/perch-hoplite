@@ -126,9 +126,10 @@ class AudioSources(hoplite_interface.EmbeddingMetadata):
   def get_file_length_s(self, filepath: str) -> float:
     """Returns the length of the audio file in seconds."""
     try:
-      sf = soundfile.SoundFile(filepath)
-      file_length_s = sf.frames / sf.samplerate
-      return file_length_s
+      with epath.Path(filepath).open('rb') as f:
+        sf = soundfile.SoundFile(f)
+        file_length_s = sf.frames / sf.samplerate
+        return file_length_s
     except Exception as exc:  # pylint: disable=broad-exception-caught
       logging.error('Failed to parse audio file (%s) : %s.', filepath, exc)
     return -1
