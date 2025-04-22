@@ -27,6 +27,59 @@ from perch_hoplite.taxonomy import namespace
 TAXONOMY_DATABASE_FILENAME = "taxonomy/taxonomy_database.json"
 
 
+ClassListType = str | namespace.ClassList | tuple[str, ...]
+MappingType = str | namespace.Mapping | dict[str, str]
+
+
+def get_classes(class_list: ClassListType) -> tuple[str, ...]:
+  """Load classes from the namespace database.
+
+  Args:
+    class_list: Name of the class list to load. This can be a class list,
+      namespace, or mapping name. If it is a mapping name, the sorted tuple of
+      all target classes is returned. If an actual ClassList is passed, the
+      tuple of classes is returned.
+
+  Returns:
+    A tuple of classes.
+  """
+  if isinstance(class_list, namespace.ClassList):
+    return class_list.classes
+  elif isinstance(class_list, tuple):
+    return class_list
+
+  db = load_db()
+  if class_list in db.class_lists:
+    return db.class_lists[class_list].classes
+  elif class_list in db.namespaces:
+    return tuple(sorted(tuple(db.namespaces[class_list].classes)))
+  elif class_list in db.mappings:
+    image_classes = db.mappings[class_list].mapped_pairs.values()
+    return tuple(sorted(tuple(image_classes)))
+  else:
+    raise ValueError(
+        "Class list %s not found in namespace database." % class_list
+    )
+
+
+def get_mapping(mapping: MappingType) -> dict[str, str]:
+  """Load mapping from the namespace database."""
+  if isinstance(mapping, namespace.Mapping):
+    return mapping.mapped_pairs
+  elif isinstance(mapping, dict):
+    return mapping
+  db = load_db()
+  if mapping in db.mappings:
+    return db.mappings[mapping].mapped_pairs
+  else:
+    raise ValueError("Mapping %s not found in namespace database." % mapping)
+
+
+def num_classes(class_list: ClassListType) -> int:
+  """Return the number of classes in the class list."""
+  return len(get_classes(class_list))
+
+
 @dataclasses.dataclass
 class TaxonomyDatabase:
   namespaces: dict[str, namespace.Namespace]
