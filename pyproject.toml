@@ -26,16 +26,16 @@ authors = [
 # they will be installed when using `pip install`.
 # Other dependency groups will not be installed by pip, however.
 # See: https://python-poetry.org/docs/managing-dependencies/#dependency-groups
-python = ">=3.10,<3.12"
+python = ">=3.10,<3.13"
 absl-py = "^1.4.0"
 ml-collections = "^0.1.1"
 etils = {version = "^1.5.0", extras = ["epath"]}
 imageio = "^2.5.0"
 matplotlib = "^3.6.1"
-notebook = "^7.0.4"
-librosa = "^0.10.1"
+notebook = "^7.4"
+librosa = "^0.11"
 numpy = "^1.24.0"
-usearch = "^2.15"
+usearch = "^2.17"
 pandas = {version = "^2.1.1", extras=["gcp"]}
 ipywidgets = "^8.1"
 
@@ -43,15 +43,15 @@ ipywidgets = "^8.1"
 optional = false
 
 [tool.poetry.group.tf.dependencies]
-tensorflow = "^2.16"
-tensorflow-hub = "^0.16.0"
+tensorflow = "^2.19"
+tensorflow-hub = "^0.16"
 
 [tool.poetry.group.jax]
 optional = true
 
 [tool.poetry.group.jax.dependencies]
-flax = "^0.8.1"
-jax = "^0.4.16"
+flax = "^0.10"
+jax = "^0.6"
 
 
 [build-system]
