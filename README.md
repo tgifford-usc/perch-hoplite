@@ -4,11 +4,34 @@
 
 Hoplite is a system for storing large volumes of embeddings from machine
 perception models. We focus on combining vector search with active learning
-workflows, aka [agile modeling](https://arxiv.org/abs/2302.12948).
+workflows, aka [agile modeling](https://arxiv.org/abs/2505.03071).
 
-While we get this documentation ready, we recommend checking out the main
-[Perch repository](https://github.com/google-research/perch), which includes
-embedding model training code.
+In brief, agile modeling is a process for rapidly developing classifiers using
+embeddings from a pre-trained 'foundation' model. For bioacoustics work, we
+find that new classifiers can often be developed for new signals in under
+an hour.
+
+How does it work?
+
+We first use a bioacoustics model to convert your unlabeled audio data into
+embeddings - these are like semantic 'fingerprints' of 5-second audio clips.
+Then, you can *search* the embeddings of your data by providing an example
+of what you're looking for. You then give feedback on the results - which
+examples are and are not what you're looking for. From this feedback, we
+can quickly train a classifier. You can then improve on the classifier with
+*active learning*: Examine the classifier outputs, provide more feedback,
+and re-train the classifier.
+
+A key feature of this workflow is that we pre-compute the embeddings. This
+may take a while if you have a large amount of data, but the subsequent
+search and classifier training is very efficient.
+
+To get started, load up the following Colab/Jupyter notebooks:
+* `agile/1_embed_audio_v2.ipynb` - Computes embeddings of your audio data.
+* `agile/2_agile_modeling_v2.ipynb` - Perform search, classification, and active
+  learning.
+
+## Repository Contents
 
 This repository consists of four sub-libraries:
 

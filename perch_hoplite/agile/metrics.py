@@ -198,6 +198,8 @@ def generalized_mean_rank(
     label_mask = np.take_along_axis(label_mask, idx, axis=-1)
 
   num_p = (labels > 0).sum(axis=-1, where=label_mask)
+  # Prevent divsion by zero is num_p is zero.
+  num_p = np.maximum(num_p, 1)
   num_p_above = np.cumsum((labels > 0) & label_mask, axis=-1)
   num_n = (labels == 0).sum(axis=-1, where=label_mask)
   num_n_above = np.cumsum((labels == 0) & label_mask, axis=-1)
