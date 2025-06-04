@@ -142,14 +142,16 @@ class EmbedWorker:
     else:
       raise ValueError('Invalid target_sample_rate.')
 
-  def load_audio(self, source_id: source_info.SourceId) -> np.ndarray | None:
+  def load_audio(
+      self, source_id: source_info.SourceId, target_sample_rate_hz: int
+  ) -> np.ndarray | None:
     """Load audio from the indicated source and log any problems."""
     try:
       audio_array = audio_io.load_audio_window(
-          source_id.filepath,
-          source_id.offset_s,
-          self.get_sample_rate_hz(source_id),
-          source_id.shard_len_s,
+          filepath=source_id.filepath,
+          offset_s=source_id.offset_s,
+          sample_rate=target_sample_rate_hz,
+          window_size_s=source_id.shard_len_s,
       )
       return np.array(audio_array)
     except soundfile.LibsndfileError as inst:
@@ -166,6 +168,28 @@ class EmbedWorker:
       else:
         self._log_error(source_id, inst, 'audio_runtime_error')
 
+  def compute_hop_size_s(
+      self, source_id: source_info.SourceId, target_sample_rate_hz: int
+  ) -> float:
+    """Compute the hop size of the embedding model."""
+
+    if hasattr(self.embedding_model, 'hop_size_s'):
+      model_hop_size_s = float(self.embedding_model.hop_size_s)
+    else:
+      # TODO(tomdenton): Allow user specified hop size.
+      raise ValueError('hop_size_s is not defined for the model.')
+    model_sample_rate = self.embedding_model.sample_rate
+
+    if target_sample_rate_hz == -2:
+      return model_hop_size_s
+    elif target_sample_rate_hz == -1:
+      audio_sample_rate = source_id.sample_rate_hz
+    elif target_sample_rate_hz > 0:
+      audio_sample_rate = target_sample_rate_hz
+    else:
+      raise ValueError('Invalid target_sample_rate.')
+    return model_hop_size_s * audio_sample_rate / model_sample_rate
+
   def embedding_exists(self, source_id: source_info.SourceId) -> bool:
     """Check whether embeddings already exist for the given source ID."""
     embs = self.db.get_embeddings_by_source(
@@ -180,7 +204,9 @@ class EmbedWorker:
   ) -> Iterator[tuple[hoplite_interface.EmbeddingSource, np.ndarray]]:
     """Process a single audio source."""
     glob = self.audio_globs[source_id.dataset_name]
-    audio_array = self.load_audio(source_id)
+    target_sample_rate = self.get_sample_rate_hz(source_id)
+    audio_array = self.load_audio(source_id, target_sample_rate)
+
     if audio_array is None:
       return
     if (
@@ -198,7 +224,7 @@ class EmbedWorker:
     embeddings = outputs.embeddings
     if embeddings is None:
       return
-    hop_size_s = getattr(self.embedding_model, 'hop_size_s', 0.0)
+    hop_size_s = self.compute_hop_size_s(source_id, target_sample_rate)
     for t, embedding in enumerate(embeddings):
       offset_s = source_id.offset_s + t * hop_size_s
       emb_source_id = hoplite_interface.EmbeddingSource(

@@ -35,6 +35,7 @@ class SourceId:
   offset_s: float
   shard_len_s: float
   filepath: str
+  sample_rate_hz: int
 
   def to_id(self):
     return f'{self.dataset_name}:{self.file_id}:{self.offset_s}'
@@ -123,16 +124,18 @@ class AudioSources(hoplite_interface.EmbeddingMetadata):
         )
     return AudioSources(tuple(other_globs.values()))
 
-  def get_file_length_s(self, filepath: str) -> float:
+  def get_file_length_s_and_sample_rate(
+      self, filepath: str
+  ) -> tuple[float, int]:
     """Returns the length of the audio file in seconds."""
     try:
       with epath.Path(filepath).open('rb') as f:
         sf = soundfile.SoundFile(f)
         file_length_s = sf.frames / sf.samplerate
-        return file_length_s
+        return file_length_s, sf.samplerate
     except Exception as exc:  # pylint: disable=broad-exception-caught
       logging.error('Failed to parse audio file (%s) : %s.', filepath, exc)
-    return -1
+    return -1, -1
 
   def iterate_all_sources(
       self,
@@ -160,6 +163,9 @@ class AudioSources(hoplite_interface.EmbeddingMetadata):
 
       for filepath in tqdm.tqdm(filepaths):
         file_id = filepath.as_posix()[len(base_path.as_posix()) + 1 :]
+        audio_len_s, sample_rate_hz = self.get_file_length_s_and_sample_rate(
+            filepath
+        )
         if shard_len_s is None:
           yield SourceId(
               dataset_name=glob.dataset_name,
@@ -167,11 +173,11 @@ class AudioSources(hoplite_interface.EmbeddingMetadata):
               offset_s=0,
               shard_len_s=-1,
               filepath=filepath.as_posix(),
+              sample_rate_hz=sample_rate_hz,
           )
           continue
 
         # Otherwise, need to emit sharded SourceId's.
-        audio_len_s = self.get_file_length_s(filepath)
         if audio_len_s <= 0:
           continue
         shard_num = 0
@@ -192,5 +198,6 @@ class AudioSources(hoplite_interface.EmbeddingMetadata):
               offset_s=offset_s,
               shard_len_s=shard_len_s,
               filepath=filepath.as_posix(),
+              sample_rate_hz=sample_rate_hz,
           )
           shard_num += 1
