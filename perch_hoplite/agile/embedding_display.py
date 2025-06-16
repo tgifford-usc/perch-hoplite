@@ -20,8 +20,8 @@ import functools
 from typing import Callable, Iterator, Sequence
 
 import IPython
-from IPython.display import clear_output
-from IPython.display import display as ipy_display
+from IPython.display import clear_output  # pylint: disable=g-importing-member
+from IPython.display import display as ipy_display  # pylint: disable=g-importing-member
 import ipywidgets
 import librosa
 from librosa import display as librosa_display
@@ -433,7 +433,7 @@ def pcen_melspec_display(
       power=1.0 / root,
       axis=0,
   )
-  return np.flipud(pspec).T[:-1]
+  return pspec.T[:-1]
 
 
 @functools.cache
