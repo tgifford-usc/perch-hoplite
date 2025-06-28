@@ -83,12 +83,12 @@ class QueryDisplay:
     )
     return fig, img, ax
 
-  def display(self):
+  def display(self, display_full: bool = True):
     """Display the audio, spectrogram, and label buttons."""
     self.update_audio()
     self.update_spectrogram()
     # Display full-audio spectrogram
-    if self.full_spectrogram is not None:
+    if display_full and self.full_spectrogram is not None:
       librosa_display.specshow(
           self.full_spectrogram.T,
           sr=self.sample_rate_hz,
@@ -114,7 +114,8 @@ class QueryDisplay:
       )
       plt.show()
 
-    ipy_display(IPython.display.Audio(self.audio, rate=self.sample_rate_hz))
+    if display_full:
+      ipy_display(IPython.display.Audio(self.audio, rate=self.sample_rate_hz))
     window_st = int(self.offset_s * self.sample_rate_hz)
     window_end = int(window_st + self.window_size_s * self.sample_rate_hz)
     audio_window = self.audio[window_st:window_end]
