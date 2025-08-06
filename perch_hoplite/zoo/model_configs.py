@@ -29,6 +29,7 @@ class ModelConfigName(enum.Enum):
   BIRDNET_V2_1 = 'birdnet_V2.1'
   BIRDNET_V2_2 = 'birdnet_V2.2'
   BIRDNET_V2_3 = 'birdnet_V2.3'
+  PERCH_V2 = 'perch_v2'
   PERCH_8 = 'perch_8'
   SURFPERCH = 'surfperch'
   VGGISH = 'vggish'
@@ -115,6 +116,17 @@ def get_preset_model_config(preset_name: str | ModelConfigName) -> PresetInfo:
     model_config.hop_size_s = 5.0
     model_config.sample_rate = 32000
     model_config.tfhub_version = 8
+    model_config.model_path = ''
+  elif preset_name == ModelConfigName.PERCH_V2:
+    model_key = 'taxonomy_model_tf'
+    embedding_dim = 1536
+    model_config.window_size_s = 5.0
+    model_config.hop_size_s = 5.0
+    model_config.sample_rate = 32000
+    taxonomy_model_tf = importlib.import_module(
+        'perch_hoplite.zoo.taxonomy_model_tf')
+    model_config.tfhub_path = taxonomy_model_tf.PERCH_V2_TF_HUB_URL
+    model_config.tfhub_version = 1
     model_config.model_path = ''
   elif preset_name == ModelConfigName.HUMPBACK:
     model_key = 'google_whale'

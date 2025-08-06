@@ -34,6 +34,11 @@ PERCH_TF_HUB_URL = (
     'variations/bird-vocalization-classifier/versions'
 )
 
+PERCH_V2_TF_HUB_URL = (
+    'https://www.kaggle.com/models/google/bird-vocalization-classifier/'
+    'tensorFlow2/perchv2/1'
+)
+
 SURFPERCH_TF_HUB_URL = (
     'https://www.kaggle.com/models/google/surfperch/TensorFlow2/1'
 )
@@ -72,13 +77,21 @@ class TaxonomyModelTF(zoo_interface.EmbeddingModel):
   def load_class_lists(cls, csv_glob):
     class_lists = {}
     for csv_path in csv_glob:
+      key = csv_path.name.replace('.csv', '')
       with csv_path.open('r') as f:
-        key = csv_path.name.replace('.csv', '')
-        class_lists[key] = namespace.ClassList.from_csv(f)
+        try:
+          class_lists[key] = namespace.ClassList.from_csv(f)
+        except ValueError as e:
+          # Some CSV assets aren't really class lists, so we just skip them.
+          logging.warning('Failed to load class list %s: %s', csv_path, e)
+          continue
     return class_lists
 
   @classmethod
-  def from_tfhub(cls, config: config_dict.ConfigDict) -> 'TaxonomyModelTF':
+  def from_tfhub(
+      cls,
+      config: config_dict.ConfigDict,
+  ) -> 'TaxonomyModelTF':
     if not hasattr(config, 'tfhub_version') or config.tfhub_version is None:
       raise ValueError('tfhub_version is required to load from TFHub.')
     if config.model_path:
@@ -144,6 +157,22 @@ class TaxonomyModelTF(zoo_interface.EmbeddingModel):
         'target_peak': 0.25,
         'tfhub_version': tfhub_version,
         'tfhub_path': SURFPERCH_TF_HUB_URL,
+    })
+    return cls.from_tfhub(cfg)
+
+  @classmethod
+  def load_v2_version(
+      cls, tfhub_version: int, hop_size_s: float = 5.0
+  ) -> 'TaxonomyModelTF':
+    """Load a model from TFHub."""
+    cfg = config_dict.ConfigDict({
+        'model_path': '',
+        'sample_rate': 32000,
+        'window_size_s': 5.0,
+        'hop_size_s': hop_size_s,
+        'target_peak': 0.25,
+        'tfhub_version': tfhub_version,
+        'tfhub_path': PERCH_V2_TF_HUB_URL,
     })
     return cls.from_tfhub(cfg)
 
@@ -265,8 +294,12 @@ class TaxonomyModelTF(zoo_interface.EmbeddingModel):
 
     if not self.batchable:
       outputs = self._nonbatchable_batch_embed(rebatched_audio)
-    else:
+    elif hasattr(self.model, 'infer_tf'):
+      # Older TFJax export.
       outputs = self.model.infer_tf(rebatched_audio)
+    else:
+      # Perch v2 style.
+      outputs = self.model.signatures['serving_default'](inputs=rebatched_audio)
 
     frontend_output = None
     if hasattr(outputs, 'keys'):
@@ -274,6 +307,10 @@ class TaxonomyModelTF(zoo_interface.EmbeddingModel):
       embeddings = outputs.pop('embedding')
       if 'frontend' in outputs:
         frontend_output = outputs.pop('frontend')
+      elif 'spectrogram' in outputs:
+        frontend_output = outputs.pop('spectrogram')
+      if 'spatial_embedding' in outputs:
+        outputs.pop('spatial_embedding')
       # Assume remaining outputs are all logits.
       logits = outputs
     elif len(outputs) == 2:
